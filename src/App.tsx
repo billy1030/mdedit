@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   FileText,
   Download,
-  Upload,
+  FolderOpen,
   Sun,
   Moon,
   Save,
@@ -23,10 +23,12 @@ import {
   Box,
   Code,
   Sparkles,
-  Columns
+  Columns,
+  FilePlus
 } from 'lucide-react';
 import { DirectArticleEditor } from './components/DirectArticleEditor';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
+import { FileSidebar, DirectoryFileItem } from './components/FileSidebar';
 import { DEFAULT_MARKDOWN } from './constants/defaultMarkdown';
 import { generateStandaloneExportHtml } from './utils/htmlExport';
 
@@ -42,7 +44,15 @@ export function App() {
   const [viewMode, setViewMode] = useState<EditViewMode>('wysiwyg');
   const [contentWidth, setContentWidth] = useState<number>(82);
   const [docRevision, setDocRevision] = useState<number>(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [dirName, setDirName] = useState<string | null>(null);
+  const [dirFiles, setDirFiles] = useState<DirectoryFileItem[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
+
+  const [nativeDirPath, setNativeDirPath] = useState<string | null>(null);
+
+  const dirInputRef = useRef<HTMLInputElement>(null);
   const codeTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -59,6 +69,17 @@ export function App() {
   const handleSaveToLocal = () => {
     localStorage.setItem('mdedit_content', content);
     setIsSaved(true);
+  };
+
+  const handleNewDocument = () => {
+    if (!isSaved) {
+      const confirmDiscard = window.confirm('You have unsaved changes. Create new document anyway?');
+      if (!confirmDiscard) return;
+    }
+    setContent(DEFAULT_MARKDOWN);
+    setIsSaved(true);
+    setActiveFileId(null);
+    setDocRevision((r) => r + 1);
   };
 
   const handleExportMarkdown = () => {
@@ -82,21 +103,182 @@ export function App() {
     URL.revokeObjectURL(a.href);
   };
 
-  const handleOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (typeof text === 'string') {
-        setContent(text);
-        setIsSaved(true);
-        setDocRevision((r) => r + 1);
+  // Helper to read directory via File System Access API
+  const scanDirectoryHandle = async (handle: FileSystemDirectoryHandle) => {
+    try {
+      const items: DirectoryFileItem[] = [];
+      // Type assertion for entries iterator
+      for await (const [name, entry] of (handle as any).entries()) {
+        if (entry.kind === 'file') {
+          const lower = name.toLowerCase();
+          const isMd = lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt');
+          items.push({
+            id: name,
+            name,
+            handle: entry as FileSystemFileHandle,
+            isMarkdown: isMd,
+          });
+        }
       }
-    };
-    reader.readAsText(file);
-    // Reset input value so opening the exact same file again triggers change event
+      // Sort markdown files first, then alphabetically
+      items.sort((a, b) => {
+        if (a.isMarkdown && !b.isMarkdown) return -1;
+        if (!a.isMarkdown && b.isMarkdown) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      setDirFiles(items);
+      setDirName(handle.name);
+      setDirHandle(handle);
+      setNativeDirPath(null);
+      setIsSidebarOpen(true);
+    } catch (err) {
+      console.error('Error scanning directory:', err);
+    }
+  };
+
+  // Scan directory via Tauri native plugin-fs
+  const scanNativeDirectory = async (folderPath: string) => {
+    try {
+      const { readDir } = await import('@tauri-apps/plugin-fs');
+      const entries = await readDir(folderPath);
+      const items: DirectoryFileItem[] = [];
+
+      for (const entry of entries) {
+        if (entry.isFile) {
+          const lower = entry.name.toLowerCase();
+          const isMd = lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt');
+          const sep = folderPath.includes('\\') ? '\\' : '/';
+          const fullPath = folderPath.endsWith(sep) ? `${folderPath}${entry.name}` : `${folderPath}${sep}${entry.name}`;
+          items.push({
+            id: fullPath,
+            name: entry.name,
+            nativePath: fullPath,
+            isMarkdown: isMd,
+          });
+        }
+      }
+
+      items.sort((a, b) => {
+        if (a.isMarkdown && !b.isMarkdown) return -1;
+        if (!a.isMarkdown && b.isMarkdown) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      const parts = folderPath.replace(/\\/g, '/').split('/');
+      const detectedName = parts.filter(Boolean).pop() || folderPath;
+      setDirName(detectedName);
+      setNativeDirPath(folderPath);
+      setDirFiles(items);
+      setIsSidebarOpen(true);
+    } catch (err) {
+      console.error('Tauri readDir failed:', err);
+    }
+  };
+
+  // Select Directory triggered by Open button
+  const handleOpenDirectory = async () => {
+    // 1. If running inside Tauri desktop app, use native OS Folder Dialog ("Select Folder" / "Open")
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      try {
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          title: 'Select Folder',
+        });
+        if (selected && typeof selected === 'string') {
+          await scanNativeDirectory(selected);
+          return;
+        }
+      } catch (err) {
+        console.warn('Tauri open dialog error, falling back:', err);
+      }
+    }
+
+    // 2. Modern Web Browser API (showDirectoryPicker)
+    if ('showDirectoryPicker' in window) {
+      try {
+        const handle = await (window as any).showDirectoryPicker();
+        await scanDirectoryHandle(handle);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        console.warn('showDirectoryPicker failed or cancelled, falling back to input:', err);
+      }
+    }
+
+    // 3. Fallback to directory input element
+    if (dirInputRef.current) {
+      dirInputRef.current.click();
+    }
+  };
+
+  // Handle directory files from fallback input (webkitdirectory)
+  const handleDirectoryInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const items: DirectoryFileItem[] = [];
+    let detectedDirName = 'Selected Folder';
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const relPath = file.webkitRelativePath || file.name;
+      if (i === 0 && file.webkitRelativePath) {
+        detectedDirName = file.webkitRelativePath.split('/')[0] || 'Selected Folder';
+      }
+      const lower = file.name.toLowerCase();
+      const isMd = lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt');
+
+      items.push({
+        id: relPath,
+        name: file.name,
+        relativePath: relPath,
+        file: file,
+        isMarkdown: isMd,
+      });
+    }
+
+    items.sort((a, b) => {
+      if (a.isMarkdown && !b.isMarkdown) return -1;
+      if (!a.isMarkdown && b.isMarkdown) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    setDirName(detectedDirName);
+    setDirFiles(items);
+    setIsSidebarOpen(true);
     e.target.value = '';
+  };
+
+  // Handle selecting a file from sidebar
+  const handleSelectFileItem = async (fileItem: DirectoryFileItem) => {
+    try {
+      let text = '';
+      if (fileItem.nativePath) {
+        const { readTextFile } = await import('@tauri-apps/plugin-fs');
+        text = await readTextFile(fileItem.nativePath);
+      } else if (fileItem.handle) {
+        const file = await fileItem.handle.getFile();
+        text = await file.text();
+      } else if (fileItem.file) {
+        text = await fileItem.file.text();
+      }
+      setContent(text);
+      setActiveFileId(fileItem.id);
+      setIsSaved(true);
+      setDocRevision((r) => r + 1);
+    } catch (err) {
+      console.error('Failed to read file:', err);
+    }
+  };
+
+  const handleRefreshDirectory = async () => {
+    if (nativeDirPath) {
+      await scanNativeDirectory(nativeDirPath);
+    } else if (dirHandle) {
+      await scanDirectoryHandle(dirHandle);
+    }
   };
 
   // SLS Inserter & Formatter
@@ -448,16 +630,9 @@ export function App() {
 
           <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
 
-          {/* Open Markdown File */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleOpenFile}
-            accept=".md,.markdown,.txt"
-            style={{ display: 'none' }}
-          />
+          {/* New Document Button */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleNewDocument}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -470,9 +645,41 @@ export function App() {
               border: '1px solid var(--border)',
               cursor: 'pointer',
             }}
-            title="Open Markdown File"
+            title="New Document"
           >
-            <Upload size={15} />
+            <FilePlus size={15} />
+          </button>
+
+          {/* Hidden Directory Input (Fallback) */}
+          <input
+            type="file"
+            ref={dirInputRef}
+            onChange={handleDirectoryInputChange}
+            // @ts-ignore
+            webkitdirectory=""
+            directory=""
+            multiple
+            style={{ display: 'none' }}
+          />
+
+          {/* Browse Directory Button */}
+          <button
+            onClick={handleOpenDirectory}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--btn-bg)',
+              color: 'var(--text-main)',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+            title="Browse Directory / Select Folder"
+          >
+            <FolderOpen size={15} />
           </button>
 
           {/* Save to Local Storage */}
@@ -515,7 +722,7 @@ export function App() {
             <Download size={15} />
           </button>
 
-          {/* Export Standalone HTML */}
+          {/* Export Standalone HTML (styled same as other toolbar buttons) */}
           <button
             onClick={handleExportHtml}
             style={{
@@ -525,11 +732,10 @@ export function App() {
               width: '32px',
               height: '32px',
               borderRadius: '6px',
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              border: 'none',
+              backgroundColor: 'var(--btn-bg)',
+              color: 'var(--text-main)',
+              border: '1px solid var(--border)',
               cursor: 'pointer',
-              boxShadow: '0 1px 3px rgba(2, 132, 199, 0.3)',
             }}
             title="Export Standalone HTML (with Diagrams & Styles)"
           >
@@ -629,6 +835,19 @@ export function App() {
 
       {/* Main Workspace */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', width: '100%', height: 'calc(100vh - 54px)' }}>
+        {/* Left: Directory Files Sidebar */}
+        <FileSidebar
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen((open) => !open)}
+          dirName={dirName}
+          files={dirFiles}
+          activeFileId={activeFileId}
+          onSelectFile={handleSelectFileItem}
+          onOpenDirectory={handleOpenDirectory}
+          onNewDocument={handleNewDocument}
+          onRefresh={dirHandle ? handleRefreshDirectory : undefined}
+        />
+
         {viewMode === 'wysiwyg' && (
           <div style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}>
             <DirectArticleEditor
