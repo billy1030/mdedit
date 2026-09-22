@@ -79,10 +79,15 @@ export async function extractDrawioXml(rawContent: string): Promise<string> {
   // Strip accidental markdown fences or backticks
   trimmed = trimmed.replace(/^`+|`+$/g, '').trim();
 
-  // Find root XML element if preceded by text or backticks
+  // Find root XML element and trim any trailing non-XML characters (like stray backticks or text)
   const xmlStartIdx = trimmed.indexOf('<');
-  if (xmlStartIdx > 0) {
-    trimmed = trimmed.slice(xmlStartIdx).trim();
+  if (xmlStartIdx !== -1) {
+    const xmlEndIdx = trimmed.lastIndexOf('>');
+    if (xmlEndIdx !== -1 && xmlEndIdx > xmlStartIdx) {
+      trimmed = trimmed.slice(xmlStartIdx, xmlEndIdx + 1).trim();
+    } else if (xmlStartIdx > 0) {
+      trimmed = trimmed.slice(xmlStartIdx).trim();
+    }
   }
 
   // If there is a compressed <diagram>...</diagram> payload, unpack it
