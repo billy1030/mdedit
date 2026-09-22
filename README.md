@@ -1,4 +1,4 @@
-﻿# MDEdit Studio
+# MDEdit
 
 A modern, high-performance Markdown Viewer and Visual Editor with native support for the **Triple Visual Diagram Engine**:
 
@@ -7,23 +7,22 @@ A modern, high-performance Markdown Viewer and Visual Editor with native support
 - **Draw.io (diagrams.net) Interactive Architecture Models**: Embedded viewer with bi-directional postMessage communication, auto-deflate unpacking, direct diagrams.net editor launch, and PNG/SVG export.
 - **Standalone HTML Export Engine**: Inspired by SLS and MiniBot, exports a 100% self-contained single `.html` document for offline reading, sharing, and standard A4 PDF printing.
 
-## Project Location
-`C:\ai\mdedit`
-
-## Quick Start
-Run the convenient startup batch file:
-```cmd
-C:\ai\mdedit\start.bat
-```
-Or run via terminal:
+## Quick Start (Web)
 ```bash
-cd C:\ai\mdedit
 npm run dev
 ```
-Then open your browser at **http://localhost:5188**.
 
-## Production Build
+## Desktop Standalone App (Tauri v2)
+To run the desktop app in development mode:
 ```bash
-cd C:\ai\mdedit
-npm run build
+npm run tauri dev
 ```
+
+To build standalone Windows release executables:
+```bash
+npm run tauri:build
+```
+Build artifacts are placed in the `release/` directory:
+- **`release/MDEdit.exe`**: Portable standalone executable (no installation required).
+- **`release/MDEdit_1.0.0_x64-setup.exe`**: Windows NSIS setup installer.
+- **`release/MDEdit_1.0.0_x64_en-US.msi`**: Windows MSI installer package.
