@@ -38,6 +38,8 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ xml, index = 0 }) =>
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const unpackedXmlRef = useRef<string>(unpackedXml);
+  unpackedXmlRef.current = unpackedXml;
 
   // Unpack compressed Draw.io XML if required
   useEffect(() => {
@@ -45,6 +47,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ xml, index = 0 }) =>
     extractDrawioXml(xml).then((extracted) => {
       if (!isCancelled) {
         setUnpackedXml(extracted);
+        unpackedXmlRef.current = extracted;
       }
     });
     return () => {
@@ -92,7 +95,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ xml, index = 0 }) =>
         const msg = JSON.parse(e.data);
         if (msg.event === 'init') {
           // Send the XML payload to the diagrams.net embed iframe
-          sendLoadToIframe(unpackedXml);
+          sendLoadToIframe(unpackedXmlRef.current);
         } else if (msg.event === 'export') {
           // Export response from diagrams.net
           setIsExporting(false);
@@ -112,7 +115,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ xml, index = 0 }) =>
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [unpackedXml, sendLoadToIframe, index]);
+  }, [sendLoadToIframe, index]);
 
   // If unpackedXml updates after iframe was already initialized, re-send load action
   useEffect(() => {

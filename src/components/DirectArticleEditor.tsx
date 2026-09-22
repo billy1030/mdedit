@@ -54,14 +54,14 @@ export const DirectArticleEditor: React.FC<DirectArticleEditorProps> = ({
       return clean.replace(/```&(?!(?:amp|lt|gt|quot|apos|#\d+|#[xX][0-9a-fA-F]+);)/g, "&amp;");
     };
 
-    // 1. Extract Draw.io blocks
-    md = md.replace(/`{3,}(?:drawio|draw\.io|mxfile)\s*([\s\S]*?)`{3,}/gi, (_match, code) => {
+    // 1. Extract Draw.io blocks (Ensure code block begins on its own line so inline mentions like ````drawio` are not matched)
+    md = md.replace(/(?:^|\n)(`{3,}|~{3,})(?:drawio|draw\.io|mxfile)[^\n]*\r?\n([\s\S]*?)\r?\n\1/gi, (_match, _fence, code) => {
       const cleanCode = code.replace(/^`+|`+$/g, '').trim();
       const token = "SLSDRAWIOTOKEN" + drawioBlocks.length + "END";
       drawioBlocks.push(cleanCode);
       return "\n\n" + token + "\n\n";
     });
-    md = md.replace(/`{3,}(?:xml)?\s*(<mxfile[\s\S]*?<\/mxfile>|<diagram[\s\S]*?<\/diagram>)\s*`{3,}/gi, (_match, code) => {
+    md = md.replace(/(?:^|\n)(`{3,}|~{3,})(?:xml)?[^\n]*\r?\n\s*(<mxfile[\s\S]*?<\/mxfile>|<diagram[\s\S]*?<\/diagram>)\s*\r?\n\1/gi, (_match, _fence, code) => {
       const cleanCode = code.replace(/^`+|`+$/g, '').trim();
       const token = "SLSDRAWIOTOKEN" + drawioBlocks.length + "END";
       drawioBlocks.push(cleanCode);
@@ -69,14 +69,14 @@ export const DirectArticleEditor: React.FC<DirectArticleEditorProps> = ({
     });
 
     // 2. Extract SVG blocks in code fences
-    md = md.replace(/```(?:xml|html|svg)?\s*(<svg[\s\S]*?<\/svg>)\s*```/gi, (_match, svgContent) => {
+    md = md.replace(/(?:^|\n)(`{3,}|~{3,})(?:xml|html|svg)?[^\n]*\r?\n\s*(<svg[\s\S]*?<\/svg>)\s*\r?\n\1/gi, (_match, _fence, svgContent) => {
       const token = "SLSSVGTOKEN" + svgBlocks.length + "END";
       svgBlocks.push(sanitizeSvgXML(svgContent.trim()));
       return "\n\n" + token + "\n\n";
     });
 
     // 3. Extract raw SVG tags
-    md = md.replace(/```(<div[\s\S]*?<svg[\s\S]*?<\/svg>[\s\S]*?<\/div>|<svg[\s\S]*?<\/svg>)/gi, (match) => {
+    md = md.replace(/(<div[\s\S]*?<svg[\s\S]*?<\/svg>[\s\S]*?<\/div>|<svg[\s\S]*?<\/svg>)/gi, (match) => {
       const token = `SLSSVGTOKEN${svgBlocks.length}END`;
       svgBlocks.push(sanitizeSvgXML(match.trim()));
       return `\n\n${token}\n\n`;
@@ -127,13 +127,13 @@ export const DirectArticleEditor: React.FC<DirectArticleEditorProps> = ({
       });
     };
 
-    const mermaidRegex = /```mermaid([\s\S]*?)```/g;
+    const mermaidRegex = /(?:^|\n)(`{3,}|~{3,})mermaid[^\n]*\r?\n([\s\S]*?)\r?\n\1/gi;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = mermaidRegex.exec(md)) !== null) {
       const textBefore = md.slice(lastIndex, match.index);
-      const diagramCode = match[1].trim();
+      const diagramCode = match[2].trim();
       splitTextAndDiagramTokens(textBefore, diagramCode);
       lastIndex = match.index + match[0].length;
     }
