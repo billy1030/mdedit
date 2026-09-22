@@ -74,7 +74,16 @@ export async function unpackDrawioDiagram(compressedBase64: string): Promise<str
  */
 export async function extractDrawioXml(rawContent: string): Promise<string> {
   if (!rawContent) return '';
-  const trimmed = rawContent.trim();
+  let trimmed = rawContent.trim();
+
+  // Strip accidental markdown fences or backticks
+  trimmed = trimmed.replace(/^`+|`+$/g, '').trim();
+
+  // Find root XML element if preceded by text or backticks
+  const xmlStartIdx = trimmed.indexOf('<');
+  if (xmlStartIdx > 0) {
+    trimmed = trimmed.slice(xmlStartIdx).trim();
+  }
 
   // If there is a compressed <diagram>...</diagram> payload, unpack it
   const match = /<diagram[^>]*>([\s\S]*?)<\/diagram>/i.exec(trimmed);
@@ -88,7 +97,7 @@ export async function extractDrawioXml(rawContent: string): Promise<string> {
     }
   }
 
-  // Otherwise return standard Draw.io XML exactly as-is so it never violates XML attribute grammar
+  // Otherwise return standard Draw.io XML exactly as-is
   return trimmed;
 }
 

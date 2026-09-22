@@ -55,14 +55,16 @@ export const DirectArticleEditor: React.FC<DirectArticleEditorProps> = ({
     };
 
     // 1. Extract Draw.io blocks
-    md = md.replace(/```(?:drawio|mxfile)\s*([\s\S]*?)```/gi, (_match, code) => {
+    md = md.replace(/`{3,}(?:drawio|draw\.io|mxfile)\s*([\s\S]*?)`{3,}/gi, (_match, code) => {
+      const cleanCode = code.replace(/^`+|`+$/g, '').trim();
       const token = "SLSDRAWIOTOKEN" + drawioBlocks.length + "END";
-      drawioBlocks.push(code.trim());
+      drawioBlocks.push(cleanCode);
       return "\n\n" + token + "\n\n";
     });
-    md = md.replace(/```(?:xml)?\s*(<mxfile[\s\S]*?<\/mxfile>|<diagram[\s\S]*?<\/diagram>)\s*```/gi, (_match, code) => {
+    md = md.replace(/`{3,}(?:xml)?\s*(<mxfile[\s\S]*?<\/mxfile>|<diagram[\s\S]*?<\/diagram>)\s*`{3,}/gi, (_match, code) => {
+      const cleanCode = code.replace(/^`+|`+$/g, '').trim();
       const token = "SLSDRAWIOTOKEN" + drawioBlocks.length + "END";
-      drawioBlocks.push(code.trim());
+      drawioBlocks.push(cleanCode);
       return "\n\n" + token + "\n\n";
     });
 
