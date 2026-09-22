@@ -27,3 +27,7 @@ tsconfig.tsbuildinfo
 # Scratch scripts
 scratch-md.js
 fix-script.js
+
+# Tauri
+src-tauri/target
+release/
