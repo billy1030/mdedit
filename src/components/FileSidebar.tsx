@@ -7,8 +7,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
-  Plus
+  RefreshCw
 } from 'lucide-react';
 
 export interface DirectoryFileItem {
@@ -29,7 +28,6 @@ interface FileSidebarProps {
   activeFileId: string | null;
   onSelectFile: (fileItem: DirectoryFileItem) => void;
   onOpenDirectory: () => void;
-  onNewDocument: () => void;
   onRefresh?: () => void;
 }
 
@@ -41,7 +39,6 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   activeFileId,
   onSelectFile,
   onOpenDirectory,
-  onNewDocument,
   onRefresh
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -191,7 +188,6 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
         style={{
           padding: '8px 12px',
           display: 'flex',
-          gap: '6px',
           borderBottom: '1px solid var(--border)',
         }}
       >
@@ -204,7 +200,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
             justifyContent: 'center',
             gap: '6px',
             fontSize: '12px',
-            padding: '5px 8px',
+            padding: '6px 8px',
             borderRadius: '6px',
             backgroundColor: 'var(--btn-bg)',
             border: '1px solid var(--border)',
@@ -216,24 +212,6 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
         >
           <FolderOpen size={14} style={{ color: 'var(--accent)' }} />
           <span>Select Folder</span>
-        </button>
-
-        <button
-          onClick={onNewDocument}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '5px 8px',
-            borderRadius: '6px',
-            backgroundColor: 'var(--btn-bg)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-main)',
-            cursor: 'pointer',
-          }}
-          title="New Markdown Document"
-        >
-          <Plus size={14} />
         </button>
       </div>
 

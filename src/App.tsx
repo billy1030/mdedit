@@ -385,16 +385,16 @@ export function App() {
               </span>
               <span
                 style={{
-                  fontSize: '11px',
-                  padding: '2px 7px',
-                  borderRadius: '4px',
-                  backgroundColor: isSaved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                  color: isSaved ? '#10b981' : '#f59e0b',
-                  fontWeight: 600,
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: isSaved ? '#10b981' : '#ef4444',
+                  boxShadow: isSaved ? '0 0 6px rgba(16, 185, 129, 0.4)' : '0 0 6px rgba(239, 68, 68, 0.5)',
+                  transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
+                  display: 'inline-block',
                 }}
-              >
-                {isSaved ? 'Saved' : 'Modified'}
-              </span>
+                title={isSaved ? 'Document Saved' : 'Document Modified'}
+              />
             </div>
           </div>
         </div>
@@ -844,8 +844,7 @@ export function App() {
           activeFileId={activeFileId}
           onSelectFile={handleSelectFileItem}
           onOpenDirectory={handleOpenDirectory}
-          onNewDocument={handleNewDocument}
-          onRefresh={dirHandle ? handleRefreshDirectory : undefined}
+          onRefresh={dirHandle || nativeDirPath ? handleRefreshDirectory : undefined}
         />
 
         {viewMode === 'wysiwyg' && (
