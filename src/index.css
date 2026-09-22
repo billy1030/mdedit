@@ -971,3 +971,16 @@ html.dark .modal-turn-scroll::-webkit-scrollbar-thumb:hover {
   display: block !important;
   z-index: 2 !important;
 }
+
+/* Ensure document sheet is flush with the bottom of the window */
+.direct-editor-container {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.direct-editor-container > div:last-child {
+  border-bottom: none !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  margin-bottom: 0 !important;
+}
